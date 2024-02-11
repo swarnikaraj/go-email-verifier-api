@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
-	"net/smtp"
 	"strings"
 )
 func BodyParser( r *http.Request, x interface{}){
@@ -51,7 +50,7 @@ type ResponseStruct struct{
 	WebsiteAssociation bool `json:"website Association"`
 	Websites string `json:"Websites"`
 }
-
+var resobj ResponseStruct
 var DisposableEmailProviders = []string{
 	"mailinator.com",
 	"guerrillamail.com",
@@ -132,16 +131,15 @@ func WebsiteExists(domain string) ([]string, error) {
     return websiteNames, nil
 }
 
-func EmailHandler(w http.ResponseWriter, r *http.Request){
-	
-	var resobj ResponseStruct
-    BodyParser(r,&resobj)
+func SingleEmailVerifier(w http.ResponseWriter, r *http.Request, resobj *ResponseStruct){
+   
+	BodyParser(r,&resobj)
 	fmt.Print(resobj,"mai set ho gya hu")
 	if !(len(resobj.Email)>0){
       http.Error(w,"Bad Request",http.StatusBadRequest)
 	  return
 	}
-    disposable:=IsDisposableEmail(resobj.Email)
+	disposable:=IsDisposableEmail(resobj.Email)
     correctEmail:=SyntaxCheck(resobj.Email)
 
 	if correctEmail && !disposable {
@@ -170,26 +168,26 @@ func EmailHandler(w http.ResponseWriter, r *http.Request){
      smtpPort := "25" 
 	 fmt.Print(smtpServer,"smtpServer \n",smtpPort,"\n smtpPort")
 	 
-    client, err := smtp.Dial(smtpServer+":"+smtpPort)
-    if err != nil {
-        fmt.Println("Failed to connect to SMTP server:", err)
-        return
-    }
-    defer client.Close()
+    // client, err := smtp.Dial(smtpServer+":"+smtpPort)
+    // if err != nil {
+    //     fmt.Println("Failed to connect to SMTP server:", err)
+    //     return
+    // }
+    // defer client.Close()
 	
      
-	  if err==nil{
-		fmt.Print("Verification in process")
-		client.Hello(resobj.Email)
-		err:=client.Mail(resobj.Email)
-		if err==nil{
-			err = client.Rcpt(resobj.Email)
-			if err==nil{
-				resobj.SMTP=true
-			}
-		}
+	//   if err==nil{
+	// 	fmt.Print("Verification in process")
+	// 	client.Hello(resobj.Email)
+	// 	err:=client.Mail(resobj.Email)
+	// 	if err==nil{
+	// 		err = client.Rcpt(resobj.Email)
+	// 		if err==nil{
+	// 			resobj.SMTP=true
+	// 		}
+	// 	}
 		
-	 }
+	//  }
    
 	 txtRecord,err:=net.LookupTXT(domain)
 	if err!=nil{
@@ -229,8 +227,35 @@ func EmailHandler(w http.ResponseWriter, r *http.Request){
 	}
 	}
 	 
+}
+
+func handleExcelUpload(w http.ResponseWriter, r *http.Request){
+   file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+
+	 w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusAccepted)
+    w.Write([]byte("I can read"))
+}
+
+func EmailHandler(w http.ResponseWriter, r *http.Request){
 	
-	
+   // limiting to file upload to approx 10 mb
+	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	if err == nil && r.MultipartForm != nil && r.MultipartForm.File != nil {
+		
+		handleExcelUpload(w, r)
+		return
+	}
+
+
+	SingleEmailVerifier(w,r,&resobj)
+
 	res,_ :=json.Marshal(resobj)
     w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusAccepted)
