@@ -8,7 +8,10 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
+	"os"
 	"strings"
+
+	"github.com/xuri/excelize/v2"
 )
 func BodyParser( r *http.Request, x interface{}){
 
@@ -230,17 +233,57 @@ func SingleEmailVerifier(w http.ResponseWriter, r *http.Request, resobj *Respons
 }
 
 func handleExcelUpload(w http.ResponseWriter, r *http.Request){
-   file, _, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
+    file, _, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
 
+    // Create a copy of the uploaded file
+    tempFile, err := os.CreateTemp("", "uploaded-*.xlsx")
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer func() {
+        tempFile.Close()
+        os.Remove(tempFile.Name()) // Delete the temporary file after reading its rows
+    }()
+    _, err = io.Copy(tempFile, file)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    // Open the copied file using excelize
+    f, err := excelize.OpenFile(tempFile.Name())
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer f.Close()
+
+    // Get all the rows in the Sheet1
+    rows, err := f.GetRows("Sheet1")
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+	
+        
+    for _, row := range rows {
+        
+			email:=row[0]
+            fmt.Print(email, "\t")
+		
+        
+        fmt.Println()
+    }
 
 	 w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusAccepted)
-    w.Write([]byte("I can read"))
+    w.Write([]byte("File processed"))
 }
 
 func EmailHandler(w http.ResponseWriter, r *http.Request){
