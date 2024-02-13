@@ -209,8 +209,7 @@ func SingleEmailVerifier(w http.ResponseWriter, r *http.Request, resobj *Respons
 	dmarkRecord,err:=net.LookupTXT("_dmarc."+domain)
 
 	if err!=nil{
-		fmt.Print("Error comming 94")
-		
+		fmt.Print("Error comming 94")		
 	}
 	for _,record:=range dmarkRecord{
 		if strings.HasPrefix(record,"v=DMARC1"){
@@ -248,7 +247,8 @@ func handleExcelUpload(w http.ResponseWriter, r *http.Request){
     }
     defer func() {
         tempFile.Close()
-        os.Remove(tempFile.Name()) // Delete the temporary file after reading its rows
+        os.Remove(tempFile.Name())
+		 // Delete the temporary file after reading its rows
     }()
     _, err = io.Copy(tempFile, file)
     if err != nil {
@@ -281,7 +281,7 @@ func handleExcelUpload(w http.ResponseWriter, r *http.Request){
         fmt.Println()
     }
 
-	 w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(http.StatusAccepted)
     w.Write([]byte("File processed"))
 }
