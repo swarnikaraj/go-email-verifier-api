@@ -331,7 +331,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 
-
+      if r.Method!=http.MethodPost{
+		http.Error(w,"Method not allow", http.StatusMethodNotAllowed)
+		return
+	  }
 	SingleEmailVerifier(w,r,&resobj)
 
 	res,_ :=json.Marshal(resobj)
