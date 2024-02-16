@@ -8,10 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/mail"
-	"os"
 	"strings"
-
-	"github.com/xuri/excelize/v2"
 )
 func BodyParser( r *http.Request, x interface{}){
 
@@ -44,13 +41,13 @@ type ResponseStruct struct{
 	MX bool `json:"mx"`
 	DMARC bool `json:"dmarc"`
 	SPF bool `json:"spf"`
-	SPFRecord string `json:"SPF Record"`
-	DMARCRecord string `json:"DMARC Record"`
-	CatchAllSetUp bool `json:"Catch-All Set up"`
-    RoleBased bool `json:"Role-Based"`
+	SPFRecord string `json:"SPF_Record"`
+	DMARCRecord string `json:"DMARC_Record"`
+	CatchAllSetUp bool `json:"Catch_All_Set_up"`
+    RoleBased bool `json:"Role_Based"`
 	Role string `json:"Role"`
 	SMTP bool `json:"SMTP Verfied"`
-	WebsiteAssociation bool `json:"website Association"`
+	WebsiteAssociation bool `json:"website_Association"`
 	Websites string `json:"Websites"`
 }
 var resobj ResponseStruct
@@ -134,14 +131,110 @@ func WebsiteExists(domain string) ([]string, error) {
     return websiteNames, nil
 }
 
+func EmailVerifier(email string, resobj ResponseStruct) ResponseStruct{
+    resobj.Email=email
+
+	if (len(resobj.Email)>0){
+     disposable:=IsDisposableEmail(resobj.Email)
+     correctEmail:=SyntaxCheck(resobj.Email)
+
+	if correctEmail && !disposable {
+		fmt.Print(correctEmail, disposable)
+    // role,domain:=ExtractDomain(resobj.Email)
+	// mxRecord,err:=net.LookupMX(domain)
+	// if err!=nil{
+	// 	fmt.Print("Error comming 59")
+		
+	// }
+	// if len(mxRecord) == 0{
+    //  resobj.CatchAllSetUp=true
+	// }
+	// if(len(mxRecord)>0){
+	// 	resobj.MX=true
+	// }
+
+	// websites, err := WebsiteExists(domain)
+	// if err == nil {
+		
+	// 	resobj.WebsiteAssociation=true
+	// 	resobj.Websites=strings.Join(websites,",")
+	// }
+	
+	
+    //  smtpServer := mxRecord[0].Host
+    //  smtpPort := "25" 
+	//  fmt.Print(smtpServer,"smtpServer \n",smtpPort,"\n smtpPort")
+	 
+    // client, err := smtp.Dial(smtpServer+":"+smtpPort)
+    // if err != nil {
+    //     fmt.Println("Failed to connect to SMTP server:", err)
+    //     return
+    // }
+    // defer client.Close()
+	
+     
+	//   if err==nil{
+	// 	fmt.Print("Verification in process")
+	// 	client.Hello(resobj.Email)
+	// 	err:=client.Mail(resobj.Email)
+	// 	if err==nil{
+	// 		err = client.Rcpt(resobj.Email)
+	// 		if err==nil{
+	// 			resobj.SMTP=true
+	// 		}
+	// 	}
+		
+	//  }
+   
+	//  txtRecord,err:=net.LookupTXT(domain)
+	// if err!=nil{
+	// 	fmt.Print("Error comming 59")
+		
+	// }
+	// for _,record:=range txtRecord{
+	// 	if strings.HasPrefix(record,"v=spf1"){
+	// 		resobj.SPF=true
+	// 		resobj.SPFRecord=record
+	// 		break
+	// 	}
+
+	// }
+
+	// dmarkRecord,err:=net.LookupTXT("_dmarc."+domain)
+
+	// if err!=nil{
+	// 	fmt.Print("Error comming 94")		
+	// }
+	// for _,record:=range dmarkRecord{
+	// 	if strings.HasPrefix(record,"v=DMARC1"){
+	// 		resobj.DMARC=true
+	// 		resobj.DMARCRecord=record
+	// 		break
+	// 	}
+
+	// }
+
+	// for _, pref:=range RoleEmailPrefixes{
+	// 	if strings.EqualFold(role, pref){
+	// 		resobj.RoleBased=true
+	// 		resobj.Role=role
+	// 		break;
+	// 	}
+	// }
+	 }
+	}
+	
+
+	return resobj
+}
 func SingleEmailVerifier(w http.ResponseWriter, r *http.Request, resobj *ResponseStruct){
    
 	BodyParser(r,&resobj)
 	fmt.Print(resobj,"mai set ho gya hu")
-	if !(len(resobj.Email)>0){
-      http.Error(w,"Bad Request",http.StatusBadRequest)
-	  return
-	}
+	// if !(len(resobj.Email)>0){
+    //   http.Error(w,"Bad Request",http.StatusBadRequest)
+	//   return
+	// }
 	disposable:=IsDisposableEmail(resobj.Email)
     correctEmail:=SyntaxCheck(resobj.Email)
 
@@ -232,69 +325,60 @@ func SingleEmailVerifier(w http.ResponseWriter, r *http.Request, resobj *Respons
 }
 
 func handleExcelUpload(w http.ResponseWriter, r *http.Request){
-    file, _, err := r.FormFile("file")
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
-    defer file.Close()
+  file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
 
-    // Create a copy of the uploaded file
-    tempFile, err := os.CreateTemp("", "uploaded-*.xlsx")
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    defer func() {
-        tempFile.Close()
-        os.Remove(tempFile.Name())
-		 // Delete the temporary file after reading its rows
-    }()
-    _, err = io.Copy(tempFile, file)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
+	var emails []ResponseStruct
 
-    // Open the copied file using excelize
-    f, err := excelize.OpenFile(tempFile.Name())
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    defer f.Close()
+	// Read each line of the file
+	buf := make([]byte, 1024)
+	for {
+		n, err := file.Read(buf)
+		if err != nil && err != io.EOF {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if n == 0 {
+			break
+		}
+		lines := strings.Split(string(buf[:n]), "\n")
+		for _, line := range lines {
+			// Perform email verification
+			email := strings.TrimSpace(line)
+			var obj ResponseStruct
+			 EmailVerifier(email, obj)
+			// fmt.Println(resobj,"resobj")
+			// Add the email and verification status to the slice
+			emails = append(emails, obj)
+		}
+	}
 
-    // Get all the rows in the Sheet1
-    rows, err := f.GetRows("Sheet1")
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-	
-        
-    for _, row := range rows {
-        
-			email:=row[0]
-            fmt.Print(email, "\t")
-		
-        
-        fmt.Println()
-    }
+	// Marshal the array of EmailVerification structs to JSON
+	responseData, err := json.Marshal(emails)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	w.Header().Set("Content-Type","application/json")
-	w.WriteHeader(http.StatusAccepted)
-    w.Write([]byte("File processed"))
+	// Send the JSON response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseData)
 }
 
 func EmailHandler(w http.ResponseWriter, r *http.Request){
 	
    // limiting to file upload to approx 10 mb
-	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
-	if err == nil && r.MultipartForm != nil && r.MultipartForm.File != nil {
+	// err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	// if err == nil && r.MultipartForm != nil && r.MultipartForm.File != nil {
 		
-		handleExcelUpload(w, r)
-		return
-	}
+	// 	handleExcelUpload(w, r)
+	// 	return
+	// }
 
 
 	SingleEmailVerifier(w,r,&resobj)
